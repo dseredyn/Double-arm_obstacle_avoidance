@@ -47,15 +47,15 @@ MoveIt automatically discovers and registers these files as planning pipelines a
 
 ---
 
-## 3. Environment Setup (ROS 2 Humble; Once per New Machine)
+## 3. Environment Setup (ROS 2 Jazzy; Once per New Machine)
 
-> Tested environment: Ubuntu 22.04, ROS 2 Humble.
+> Tested environment: Ubuntu 24.04, ROS 2 Jazzy, simulation only (Gazebo Sim).
 
 ```bash
 # ① Create the workspace and place this repository's 9 packages in src/
 mkdir -p ~/hiwin_ws/src
 cd ~/hiwin_ws/src
-git clone https://github.com/dalletter2019-tech-Git/Double-arm_obstacle_avoidance.git .    # Alternatively, copy the 9 package directories here
+git clone https://github.com/dseredyn/Double-arm_obstacle_avoidance.git
 
 # ② Install dependencies (rosdep installs moveit_*, Eigen3, etc., based on each package.xml)
 cd ~/hiwin_ws
@@ -64,13 +64,29 @@ rosdep update
 rosdep install --from-paths src --ignore-src -r -y
 
 # ③ Build the entire workspace
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 colcon build --symlink-install
 ```
 
 ---
 
-## 4. Commands for Controlling the Physical Robots
+
+## 4a. Commands for Controlling the simulated robot
+
+Run the simulated system and MoveIt:
+```bash
+source ~/hiwin_ws/install/setup.bash
+ros2 launch hiwin_dual_arm_gazebo start_system.launch.py
+```
+
+You can command motions using MoveIt interface in rviz2.
+
+
+---
+
+## 4b. Commands for Controlling the Physical Robots
+
+> Note: This branch was not tested on a physical robot.
 
 The physical robot setup uses ROS domain isolation: the host computer (planning side) and the two arm drivers use different `ROS_DOMAIN_ID` values.
 `dual_arm_domain_bridge` connects these domains, merges the `joint_states` from both arms for the host,
