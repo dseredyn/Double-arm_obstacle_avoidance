@@ -4,6 +4,11 @@
     <xacro:macro name="small_arm_platform" params="tf_prefix parent *origin">
 
         <link name="${tf_prefix}platform_top_link">
+            <inertial>
+                <mass value="0.2"/>
+                <origin rpy="0 0 0" xyz="0 0 0.0625"/>
+                <inertia ixx="0.000520833333333" ixy="0" ixz="0" iyy="0.000520833333333" iyz="0" izz="0.000520833333333"/>
+            </inertial>
             <visual>
                 <geometry>
                     <!-- 替換成你的 mesh：-->

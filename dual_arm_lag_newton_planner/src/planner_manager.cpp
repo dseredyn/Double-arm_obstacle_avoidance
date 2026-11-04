@@ -15,7 +15,7 @@ namespace dual_arm_lag_newton_planner
 // =====================================================================
 // PlanningContext::solve — 主規劃流程
 // =====================================================================
-bool DualArmPlanningContext::solve(planning_interface::MotionPlanResponse& res)
+void DualArmPlanningContext::solve(planning_interface::MotionPlanResponse& res)
 {
   // 1. 計時
   auto start_time = std::chrono::steady_clock::now();
@@ -23,8 +23,7 @@ bool DualArmPlanningContext::solve(planning_interface::MotionPlanResponse& res)
   // 2. 檢查 goal constraints 有效性
   if (request_.goal_constraints.empty() ||
       request_.goal_constraints[0].joint_constraints.empty()) {
-    res.error_code_.val = moveit_msgs::msg::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
-    return false;
+    res.error_code.val = moveit_msgs::msg::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
   }
 
   // 3. 從 MoveIt 提取起點/終點
@@ -71,8 +70,7 @@ bool DualArmPlanningContext::solve(planning_interface::MotionPlanResponse& res)
 
   if (optimizer.has_collision()) {
     export_csv_if_enabled();   // [NEW] 失敗也匯出 (除錯素材; 失敗路徑無計時語意)
-    res.error_code_.val = moveit_msgs::msg::MoveItErrorCodes::PLANNING_FAILED;
-    return false;
+    res.error_code.val = moveit_msgs::msg::MoveItErrorCodes::PLANNING_FAILED;
   }
 
   // 6. 結果轉回 RobotTrajectory (⚠ degree -> radian)
@@ -142,24 +140,22 @@ bool DualArmPlanningContext::solve(planning_interface::MotionPlanResponse& res)
             << " 秒 (純規劃 " << pure_plan_time
             << " + 時間參數化 " << (total_plan_time - pure_plan_time) << ")\n";
 
-  res.trajectory_ = trajectory;
-  res.error_code_.val = moveit_msgs::msg::MoveItErrorCodes::SUCCESS;
-  res.planning_time_ = total_plan_time;   // 回報含時間參數化的總規劃時間
-  return true;
+  res.trajectory = trajectory;
+  res.error_code.val = moveit_msgs::msg::MoveItErrorCodes::SUCCESS;
+  res.planning_time = total_plan_time;   // 回報含時間參數化的總規劃時間
 }
 
 // DetailedResponse 委託 (舊版模式)
-bool DualArmPlanningContext::solve(planning_interface::MotionPlanDetailedResponse& res)
+void DualArmPlanningContext::solve(planning_interface::MotionPlanDetailedResponse& res)
 {
   planning_interface::MotionPlanResponse normal_res;
-  bool success = solve(normal_res);
-  if (success) {
-    res.trajectory_.push_back(normal_res.trajectory_);
-    res.description_.push_back("DualArmAvoidancePlanner");
-    res.processing_time_.push_back(normal_res.planning_time_);
+  solve(normal_res);
+  if (normal_res.error_code.val == moveit_msgs::msg::MoveItErrorCodes::SUCCESS) {
+    res.trajectory.push_back(normal_res.trajectory);
+    res.description.push_back("DualArmAvoidancePlanner");
+    res.processing_time.push_back(normal_res.planning_time);
   }
-  res.error_code_ = normal_res.error_code_;
-  return success;
+  res.error_code = normal_res.error_code;
 }
 
 // =====================================================================

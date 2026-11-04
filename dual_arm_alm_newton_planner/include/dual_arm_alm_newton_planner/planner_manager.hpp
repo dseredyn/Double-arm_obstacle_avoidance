@@ -32,9 +32,9 @@ public:
     : planning_interface::PlanningContext(name, group), node_(node) {}
 
   // 主要規劃進入點
-  bool solve(planning_interface::MotionPlanResponse& res) override;
+  void solve(planning_interface::MotionPlanResponse& res) override;
   // DetailedResponse 委託給上面 (舊版模式)
-  bool solve(planning_interface::MotionPlanDetailedResponse& res) override;
+  void solve(planning_interface::MotionPlanDetailedResponse& res) override;
 
   bool terminate() override { return true; }   // 本規劃器不支援中途停止
   void clear() override {}

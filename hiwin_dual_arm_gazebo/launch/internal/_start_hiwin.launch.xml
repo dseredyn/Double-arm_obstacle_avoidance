@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<launch>
+
+    <arg name="use_moveit" default="true" />
+
+    <!-- Spawn Hiwin -->
+    <include file="$(find-pkg-share hiwin_dual_arm_gazebo)/launch/internal/_spawn_hiwin.launch.py"/>
+
+    <!-- Robot state publisher -->
+    <include file="$(find-pkg-share hiwin_dual_arm_gazebo)/launch/internal/_robot_state_publisher.launch.py">
+        <arg name="use_sim_time" value="true" />
+    </include>
+
+    <!-- joint_state_broadcaster spawner -->
+    <node
+        pkg="controller_manager"
+        exec="spawner"
+        output="screen"
+        args="joint_state_broadcaster -c /controller_manager" />
+
+    <node pkg="controller_manager"
+            exec="spawner"
+            output="screen"
+            args="
+                big_controller
+                small_controller
+                --controller-manager /controller_manager
+                --controller-manager-timeout 10
+                --switch-timeout 10"/>
+
+    <!-- spawn two inactive cartesian cascade controllers-->
+    <!-- <node pkg="controller_manager"
+            exec="spawner"
+            name="spawner_cartesian_cascade_inactive"
+            output="screen"
+            args="
+                arms_torso_effort_cart
+                arms_torso_trajectory_controller_cart
+                $(var cart_active)
+                - -controller-manager /controller_manager
+                - -controller-manager-timeout 10
+                - -switch-timeout 10"
+            if="$(var use_cart)" /> -->
+
+    <!-- <node pkg="controller_manager"
+            exec="spawner"
+            name="spawner_cartesian_cascade_inactive"
+            output="screen"
+            args="
+                cartesian_controller
+                $(var cart_active)
+                - -controller-manager /controller_manager
+                - -controller-manager-timeout 10
+                - -switch-timeout 10"
+            if="$(var use_cart)" />
+
+
+    <node pkg="controller_manager"
+            exec="spawner"
+            name="spawner_head_hands_controller"
+            output="screen"
+            args="
+                head_controller
+                left_hand_controller
+                right_hand_controller
+                - -activate-as-group
+                - -controller-manager /controller_manager
+                - -controller-manager-timeout 10
+                - -switch-timeout 10"/> -->
+
+    <!-- MoveIt -->
+    <arg name="launch_moveit_rviz" default="true"/>
+
+    <!-- Run MoveIt: /move_group -->
+    <include file="$(find-pkg-share hiwin_dual_arm)/launch/move_group.launch.py" if="$(var use_moveit)">
+        <arg name="use_sim_time" value="true"/>
+    </include>
+
+    <!-- Run RViz with the specified config file. -->
+    <include
+        if="$(var launch_moveit_rviz)"
+        file="$(find-pkg-share hiwin_dual_arm)/launch/moveit_rviz.launch.py">
+        <arg name="use_sim_time" value="true"/>
+    </include>
+
+</launch>

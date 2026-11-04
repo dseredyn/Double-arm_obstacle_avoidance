@@ -38,6 +38,12 @@
     </link>
 
     <link name="${tf_prefix}link_1">
+      <!-- TODO: inertial -->
+      <inertial>
+        <mass value="0.2"/>
+        <origin rpy="0 0 0" xyz="0 0 0.0625"/>
+        <inertia ixx="0.000520833333333" ixy="0" ixz="0" iyy="0.000520833333333" iyz="0" izz="0.000520833333333"/>
+      </inertial>
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
@@ -55,7 +61,17 @@
       </collision>
     </link>
 
+    <gazebo reference="${tf_prefix}link_1">
+      <turnGravityOff>True</turnGravityOff>
+    </gazebo>
+
     <link name="${tf_prefix}link_2">
+      <!-- TODO: inertial -->
+      <inertial>
+        <mass value="0.2"/>
+        <origin rpy="0 0 0" xyz="0 0 0.0625"/>
+        <inertia ixx="0.000520833333333" ixy="0" ixz="0" iyy="0.000520833333333" iyz="0" izz="0.000520833333333"/>
+      </inertial>
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
@@ -73,7 +89,17 @@
       </collision>
     </link>
 
+    <gazebo reference="${tf_prefix}link_2">
+      <turnGravityOff>True</turnGravityOff>
+    </gazebo>
+
     <link name="${tf_prefix}link_3">
+      <!-- TODO: inertial -->
+      <inertial>
+        <mass value="0.2"/>
+        <origin rpy="0 0 0" xyz="0 0 0.0625"/>
+        <inertia ixx="0.000520833333333" ixy="0" ixz="0" iyy="0.000520833333333" iyz="0" izz="0.000520833333333"/>
+      </inertial>
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
@@ -91,7 +117,17 @@
       </collision>
     </link>
 
+    <gazebo reference="${tf_prefix}link_3">
+      <turnGravityOff>True</turnGravityOff>
+    </gazebo>
+
     <link name="${tf_prefix}link_4">
+      <!-- TODO: inertial -->
+      <inertial>
+        <mass value="0.2"/>
+        <origin rpy="0 0 0" xyz="0 0 0.0625"/>
+        <inertia ixx="0.000520833333333" ixy="0" ixz="0" iyy="0.000520833333333" iyz="0" izz="0.000520833333333"/>
+      </inertial>
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
@@ -109,7 +145,17 @@
       </collision>
     </link>
 
+    <gazebo reference="${tf_prefix}link_4">
+      <turnGravityOff>True</turnGravityOff>
+    </gazebo>
+
     <link name="${tf_prefix}link_5">
+      <!-- TODO: inertial -->
+      <inertial>
+        <mass value="0.2"/>
+        <origin rpy="0 0 0" xyz="0 0 0.0625"/>
+        <inertia ixx="0.000520833333333" ixy="0" ixz="0" iyy="0.000520833333333" iyz="0" izz="0.000520833333333"/>
+      </inertial>
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
@@ -127,7 +173,17 @@
       </collision>
     </link>
 
+    <gazebo reference="${tf_prefix}link_5">
+      <turnGravityOff>True</turnGravityOff>
+    </gazebo>
+
     <link name="${tf_prefix}link_6">
+      <!-- TODO: inertial -->
+      <inertial>
+        <mass value="0.2"/>
+        <origin rpy="0 0 0" xyz="0 0 0.0625"/>
+        <inertia ixx="0.000520833333333" ixy="0" ixz="0" iyy="0.000520833333333" iyz="0" izz="0.000520833333333"/>
+      </inertial>
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
@@ -144,6 +200,10 @@
         </geometry>
       </collision>
     </link>
+
+    <gazebo reference="${tf_prefix}link_6">
+      <turnGravityOff>True</turnGravityOff>
+    </gazebo>
 
     <!-- base_joint fixes base_link to the environment -->
     <joint name="${tf_prefix}base_joint" type="fixed">
@@ -228,7 +288,7 @@
 
     <!-- ROS-Industrial 'flange' frame - attachment point for EEF models -->
     <link name="${tf_prefix}flange" />
-    <joint name="${tf_prefix}flange" type="fixed">
+    <joint name="${tf_prefix}flange_joint" type="fixed">
       <parent link="${tf_prefix}link_6" />
       <child link="${tf_prefix}flange" />
       <origin xyz="0 0 0" rpy="-1.5708 -1.5708 0" />

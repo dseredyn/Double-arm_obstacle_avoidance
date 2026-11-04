@@ -38,12 +38,12 @@ moveit_simple_controller_manager:
   # 控制器名稱 = 手臂 namespace + 控制器名（joint_trajectory_controller）
   # MoveIt 會組成 action 路徑：/<下面的名字>/<action_ns>
   controller_names:
-    - small_arm/joint_trajectory_controller
-    - big_arm/joint_trajectory_controller
+    - big_controller
+    - small_controller
 
   # B 臂（small / RA605）
-  # -> action: /small_arm/joint_trajectory_controller/follow_joint_trajectory
-  small_arm/joint_trajectory_controller:
+  # -> action: /small_controller/follow_joint_trajectory
+  small_controller:
     type: FollowJointTrajectory
     action_ns: follow_joint_trajectory
     default: true
@@ -56,8 +56,8 @@ moveit_simple_controller_manager:
       - small_joint_6
 
   # A 臂（big / RA610）
-  # -> action: /big_arm/joint_trajectory_controller/follow_joint_trajectory
-  big_arm/joint_trajectory_controller:
+  # -> action: /big_controller/follow_joint_trajectory
+  big_controller:
     type: FollowJointTrajectory
     action_ns: follow_joint_trajectory
     default: true
