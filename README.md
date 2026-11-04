@@ -1,95 +1,111 @@
-# HIWIN 雙機械手臂 ROS 2（Humble）避障路徑規劃使用手冊
+# HIWIN Dual-Arm ROS 2 (Humble) Collision-Avoidance Path Planning User Guide
 
-本工作區（`~/hiwin_ws/src/`）共有 **9 個 ROS 2 package**：機器人描述包
-`hiwin_dual_arm_description`、MoveIt2 設定包 `hiwin_dual_arm`、
-實機跨域橋接包 `dual_arm_domain_bridge`，以及 6 個可選擇的雙臂避障規劃器。
-各規劃器的演算法推導與參數對照表，請見其各自的 `README.md` 與 `PARAMETERS.md`。
-
----
-
-## 1. 這個 workspace 在做什麼
-
-HIWIN 雙機械手臂（A 臂 RA610-1476 與 B 臂 RA605-710，面對面對裝、相距 1400mm）
-共用同一工作空間，兩臂的關節軌跡可能互撞。本 workspace 的功能是：給定兩臂各自的
-起點與終點關節角，自動規劃出一條兩臂互不碰撞的關節空間軌跡。避障演算法包成
-**MoveIt2 規劃器插件**，在 `move_group` 中作為 `planning_plugin` 使用；實機運行時，再由跨域橋接層將軌跡送往兩臂各自的驅動端執行。
+This workspace (`~/hiwin_ws/src/`) contains **9 ROS 2 packages**: the robot description package
+`hiwin_dual_arm_description`, the MoveIt2 configuration package `hiwin_dual_arm`,
+the cross-domain bridge package for the physical robots `dual_arm_domain_bridge`, and six selectable dual-arm collision-avoidance planners.
+For the mathematical derivations of each planner's algorithm and parameter comparison tables, see its respective `README.md` and `PARAMETERS.md` files.
 
 ---
 
-## 2. Package 總覽
+## 1. What Does This Workspace Do?
+
+The two HIWIN robotic arms (arm A: RA610-1476 and arm B: RA605-710, mounted facing each other, 1400 mm apart)
+share the same workspace, so their joint trajectories may cause them to collide with each other.
+Given the start and goal joint angles for each arm, this workspace automatically plans a collision-free joint-space trajectory for both arms.
+The collision-avoidance algorithms are packaged as **MoveIt2 planner plugins** and used as `planning_plugin` in `move_group`.
+When operating the physical robots, the cross-domain bridge forwards the planned trajectories to the respective arm drivers for execution.
+
+---
+
+## 2. Package Overview
 
 ```
 ~/hiwin_ws/src/
-├── hiwin_dual_arm/                  ← MoveIt2 設定包 + 啟動（非演算法）
-├── hiwin_dual_arm_description/      ← 雙臂 URDF/mesh 描述包（RA610-1476 + RA605-710 + 底盤）
-├── dual_arm_domain_bridge/          ← 實機跨域橋接（joint_states 合併 / 軌跡 action 轉送）
+├── hiwin_dual_arm/                  ← MoveIt2 configuration + launch files (not an algorithm)
+├── hiwin_dual_arm_description/      ← Dual-arm URDF/mesh description (RA610-1476 + RA605-710 + base)
+├── dual_arm_domain_bridge/         ← Cross-domain bridge for physical robots (joint_states merging / trajectory action forwarding)
 ├── dual_arm_alm_newton_planner/     ┐
-├── dual_arm_alm_cg_planner/         │  ALM 系列（增廣拉格朗日）
+├── dual_arm_alm_cg_planner/         │  ALM family (Augmented Lagrangian Method)
 ├── dual_arm_alm_gd_planner/         ┘
 ├── dual_arm_lag_newton_planner/     ┐
-├── dual_arm_lag_cg_planner/         │  Lagrangian 系列
+├── dual_arm_lag_cg_planner/         │  Lagrangian family
 └── dual_arm_lag_gd_planner/         ┘
 ```
 
-6 個規劃器解的是同一個雙臂避障問題，差別只在內層最佳化採用的數學模型與求解方法：
+All six planners solve the same dual-arm collision-avoidance problem. They differ only in the mathematical formulation and solution method used for the inner optimization:
 
-| | Newton | CG（共軛梯度） | GD（最陡下降） |
+| | Newton | CG (Conjugate Gradient) | GD (Steepest Descent) |
 |---|---|---|---|
-| **ALM 模型** | `dual_arm_alm_newton_planner` | `dual_arm_alm_cg_planner` | `dual_arm_alm_gd_planner` |
-| **Lagrangian 模型** | `dual_arm_lag_newton_planner` | `dual_arm_lag_cg_planner` | `dual_arm_lag_gd_planner` |
+| **ALM model** | `dual_arm_alm_newton_planner` | `dual_arm_alm_cg_planner` | `dual_arm_alm_gd_planner` |
+| **Lagrangian model** | `dual_arm_lag_newton_planner` | `dual_arm_lag_cg_planner` | `dual_arm_lag_gd_planner` |
 
-⚠️ ALM 與 Lagrangian 是不同數學模型，不可混用參數。
+⚠️ ALM and Lagrangian are different mathematical models; do not mix their parameters.
 
-`hiwin_dual_arm/config/` 底下的 6 份 `dual_arm_*_planning.yaml`，各自將
-`planning_plugin` 指向對應的 `DualArmXxxPlannerManager` 並帶入該規劃器的參數；
-MoveIt 會依檔名慣例（`*_planning.yaml`）自動掃描並註冊成 planning pipeline，
-不需要另外維護清單。
+The six `dual_arm_*_planning.yaml` files in `hiwin_dual_arm/config/` each set
+`planning_plugin` to the corresponding `DualArmXxxPlannerManager` and supply that planner's parameters.
+MoveIt automatically discovers and registers these files as planning pipelines according to the `*_planning.yaml` naming convention, so no separate list needs to be maintained.
 
 ---
 
-## 3. 環境建置（ROS 2 Humble，新機器只做一次）
+## 3. Environment Setup (ROS 2 Jazzy; Once per New Machine)
 
-> 測試環境：Ubuntu 22.04、ROS 2 Humble。
+> Tested environment: Ubuntu 24.04, ROS 2 Jazzy, simulation only (Gazebo Sim).
 
 ```bash
-# ① 建立工作空間，並將本 repo 的 9 個 package 放入 src/
+# ① Create the workspace and place this repository's 9 packages in src/
 mkdir -p ~/hiwin_ws/src
 cd ~/hiwin_ws/src
-git clone https://github.com/dalletter2019-tech-Git/Double-arm_obstacle_avoidance.git .    # 或直接把 9 個 package 資料夾複製進來
+git clone https://github.com/dseredyn/Double-arm_obstacle_avoidance.git
 
-# ② 安裝依賴（rosdep 依各 package.xml 自動裝 moveit_*、Eigen3 等）
+# ② Install dependencies (rosdep installs moveit_*, Eigen3, etc., based on each package.xml)
 cd ~/hiwin_ws
-sudo rosdep init            # 之前 init 過會報錯，忽略即可
+sudo rosdep init            # If rosdep was initialized previously, this may report an error; it can be ignored
 rosdep update
 rosdep install --from-paths src --ignore-src -r -y
 
-# ③ 編譯整個 workspace
-source /opt/ros/humble/setup.bash
+# ③ Build the entire workspace
+source /opt/ros/jazzy/setup.bash
 colcon build --symlink-install
 ```
 
 ---
 
-## 4. 實機控制指令
 
-實機採 domain 隔離：主機（規劃端）與兩臂驅動端各在不同的 `ROS_DOMAIN_ID`，
-由 `dual_arm_domain_bridge` 負責跨域連接，將兩臂的 `joint_states` 合併後交給主機，
-並把 `FollowJointTrajectory` action 的軌跡與執行回報在 domain 之間轉送：
+## 4a. Commands for Controlling the simulated robot
 
-```
-D0   主機:  brain.launch.py（六規劃器 + move_group + RViz）
-D10  A 臂:  RA610-1476 驅動（hiwin_driver）
-D20  B 臂:  RA605-710  驅動（hiwin_driver）
-橋層（跑在主機）: joint_states 合併 + FollowJointTrajectory action 透明轉送
+Run the simulated system and MoveIt:
+```bash
+source ~/hiwin_ws/install/setup.bash
+ros2 launch hiwin_dual_arm_gazebo start_system.launch.py
 ```
 
-> 每個終端機開頭，都先完成該小節開頭的**前置**步驟（以下不再重複）。
-> 其中 `RMW_IMPLEMENTATION` 三台機器必須一致（跨機通訊的前提）；
-> `ROS_DOMAIN_ID` 先確認目前值，再 export 成該終端所需的編號。
+You can command motions using MoveIt interface in rviz2.
 
-### 4.1 主機端（規劃 + 橋接，Domain 0）
 
-**前置**（每個終端機開頭）：
+---
+
+## 4b. Commands for Controlling the Physical Robots
+
+> Note: This branch was not tested on a physical robot.
+
+The physical robot setup uses ROS domain isolation: the host computer (planning side) and the two arm drivers use different `ROS_DOMAIN_ID` values.
+`dual_arm_domain_bridge` connects these domains, merges the `joint_states` from both arms for the host,
+and forwards the trajectories and execution feedback of the `FollowJointTrajectory` action between domains:
+
+```
+D0   Host:  brain.launch.py (six planners + move_group + RViz)
+D10  Arm A: RA610-1476 driver (hiwin_driver)
+D20  Arm B: RA605-710 driver (hiwin_driver)
+Bridge layer (running on the host): joint_states merging + transparent forwarding of FollowJointTrajectory actions
+```
+
+> At the beginning of each terminal session, complete the **prerequisite** steps specified at the start of the relevant subsection (not repeated below).
+> The `RMW_IMPLEMENTATION` setting must be identical on all three machines (a prerequisite for cross-machine communication).
+> Check the current `ROS_DOMAIN_ID` value before exporting the value required for that terminal.
+
+### 4.1 Host Computer (Planning + Bridge, Domain 0)
+
+**Prerequisites** (at the start of each terminal session):
 
 ```bash
 source ~/hiwin_ws/install/setup.bash
@@ -98,32 +114,32 @@ echo $ROS_DOMAIN_ID
 export ROS_DOMAIN_ID=0
 ```
 
-**終端 A — 規劃端**：
+**Terminal A — Planning:**
 
 ```bash
 ros2 launch hiwin_dual_arm brain.launch.py
 ```
 
-**終端 B — 橋接層**（軌跡 action 轉送 + joint_states 合併）：
+**Terminal B — Bridge** (trajectory action forwarding + joint_states merging):
 
 ```bash
 ros2 launch dual_arm_domain_bridge bridge_relay.launch.py \
      host_domain:=0 arm_a_domain:=10 arm_b_domain:=20
 ```
 
-橋接建立後，RViz 的 **Plan & Execute / Stop** 即可直接對實機（或虛擬硬體）使用。
+Once the bridge is established, RViz's **Plan & Execute / Stop** controls can be used directly with the physical robots (or simulated hardware).
 
-### 4.2 手臂端
+### 4.2 Arm Computers
 
-手臂控制器須事先依上銀官方方式，將 hiwin_ros2（`hiwin_driver`）安裝於 `~/ws_ros2`（見 §7）。
+The arm controllers must first have the official HIWIN `hiwin_ros2` (`hiwin_driver`) installed in `~/ws_ros2` according to HIWIN's instructions (see §7).
 
-**前置**（每個終端機開頭）：
+**Prerequisites** (at the start of each terminal session):
 
 ```bash
-# 第一件事：啟動 EtherCAT
+# First: start EtherCAT
 sudo /etc/init.d/ethercat start
 
-# 第二件事：source 工作空間與環境檢查
+# Second: source the workspace and check the environment
 source /opt/ros/humble/setup.bash
 cd ~/ws_ros2
 source install/setup.bash
@@ -131,84 +147,82 @@ echo $RMW_IMPLEMENTATION
 echo $ROS_DOMAIN_ID
 ```
 
-**A 臂（RA610-1476，Domain 10）**：
+**Arm A (RA610-1476, Domain 10):**
 
 ```bash
 export ROS_DOMAIN_ID=10
 taskset -c 2 ros2 launch hiwin_driver ra6_control.launch.py ra_type:=ra610_1476 cabinet:=ecat launch_rviz:=false
 ```
 
-**B 臂（RA605-710，Domain 20）**：指令同上，改為 `export ROS_DOMAIN_ID=20`、
-`ra_type:=ra605_710`。
+**Arm B (RA605-710, Domain 20):** Use the same command, but change it to `export ROS_DOMAIN_ID=20` and
+`ra_type:=ra605_710`.
 
-**解除安全繼電器**（driver 啟動後，於對應臂的 domain 下各執行一次）：
+**Reset the safety relay** (after starting the driver, execute once for each arm in its respective domain):
 
 ```bash
-# A 臂（D10）／B 臂（D20）各做一次
+# Execute once for arm A (D10) and once for arm B (D20)
 ros2 service call /gpio_controller/set_io hiwin_msgs/srv/SetIO \
      "{io_group: system, interface_name: reset_safety_rly, value: 1.0}"
 ```
 
-### 4.3 建議啟動順序
+### 4.3 Recommended Startup Order
 
 ```
-① A 臂 driver（D10）→ ② B 臂 driver（D20）→（各解除安全繼電器）
-→ ③ 橋接層（D0）→ ④ brain.launch.py（D0）→ RViz 規劃/執行
+① Arm A driver (D10) → ② Arm B driver (D20) → (reset the safety relay for each arm)
+→ ③ Bridge (D0) → ④ brain.launch.py (D0) → Plan/execute in RViz
 ```
 
 ---
 
-## 5. 切換規劃器
+## 5. Switching Planners
 
-在 RViz 左側 **MotionPlanning** 面板 → **Context** 分頁 → **Planning Library**
-下拉選單中，選擇 6 個 `dual_arm_*` 規劃器之一。
+In RViz, go to the **MotionPlanning** panel on the left → **Context** tab → **Planning Library**
+dropdown menu, and select one of the six `dual_arm_*` planners.
 
-<p align="center"><img src="docs/images/rviz_context.png" alt="RViz 規劃畫面 Context" width="600"></p>
+<p align="center"><img src="docs/images/rviz_context.png" alt="RViz Context planning view" width="600"></p>
 
 ---
 
-## 6. 設定起點 / 終點關節角（跑規劃前必做）
+## 6. Setting the Start and Goal Joint Angles (Required Before Planning)
 
-規劃器需要「起點」與「終點」才能計算避障軌跡；RViz 啟動後不會自動設定，需手動指定：
+The planner needs both a **start state** and a **goal state** to compute a collision-free trajectory.
+These states are not configured automatically when RViz starts and must be specified manually:
 
-1. **起點**：在 **Planning** 分頁的 **Start State** 下拉選單選 `<current state>`
-   ，使起點就是現在位置。同時將 **Displays → Planning Request** 下的
-   **Query Start State** 取消勾選，僅保留 **Query Goal State**（如下方截圖）。
-2. **終點**：在 3D 畫面直接拖曳 marker 到想要的終點姿態，或在 **Joints** 頁面
-   以滑桿調整成精確角度（12 個關節：`big_joint_1~6`、`small_joint_1~6`）。
-3. 起點與終點都設定好後按 **Plan**；規劃成功會在 3D 畫面播放軌跡動畫，並於左下角 log 印出耗時。
+1. **Start state:** In the **Planning** tab, select `<current state>` from the **Start State** dropdown menu to use the current robot configuration as the starting point. Also uncheck **Query Start State** under **Displays → Planning Request**, leaving only **Query Goal State** checked (see screenshot below).
+2. **Goal state:** Drag the marker in the 3D view to the desired goal pose, or use the sliders in the **Joints** tab to set precise joint angles (12 joints: `big_joint_1~6` and `small_joint_1~6`).
+3. Once the start and goal states are set, click **Plan**. If planning succeeds, a trajectory animation will play in the 3D view, and the planning time will be printed in the log in the lower-left corner.
 
-**內建命名姿態**（`dual_hiwin.srdf` 的 `group_state`，可於 Start/Goal State 下拉選單直接選用）：
+**Built-in named states** (`group_state` entries in `dual_hiwin.srdf`; selectable directly from the Start/Goal State dropdown menus):
 
-| 名稱 | 對應 group | 內容 |
+| Name | Associated group | Description |
 |---|---|---|
-| `Dual_ori` | `Dual_arm`（雙臂） | 12 軸全 0（Home 姿態） |
+| `Dual_ori` | `Dual_arm` (both arms) | All 12 joint angles set to 0 (Home configuration) |
 
-Planning 分頁：Start State 選 `<current state>`，**Query Start State** 取消勾選
+Planning tab: set Start State to `<current state>` and uncheck **Query Start State**.
 
-<p align="center"><img src="docs/images/rviz_planning.png" alt="RViz 規劃畫面 Planning" width="800"></p>
+<p align="center"><img src="docs/images/rviz_planning.png" alt="RViz Planning view" width="800"></p>
 
-Joints 頁面：以滑桿逐軸調整目標關節角，與拖曳 marker 兩種方式可互相搭配。
+Joints tab: Adjust the target joint angles individually using the sliders. This can also be combined with dragging the marker.
 
-<p align="center"><img src="docs/images/rviz_Joints.png" alt="RViz 規劃畫面 Joints" width="800"></p>
+<p align="center"><img src="docs/images/rviz_Joints.png" alt="RViz Joints view" width="800"></p>
 
 ---
 
-## 7. 上銀（HIWIN）官方 ROS 2 Humble 程式庫
+## 7. Official HIWIN ROS 2 Humble Libraries
 
-本專案結合上銀官方驅動程式庫搭配使用：
+This project is used together with the official HIWIN robot driver libraries:
 
-| 程式庫 | 說明 |
+| Library | Description |
 |---|---|
-| [hiwin_ros2](https://github.com/HIWINCorporation/hiwin_ros2) | 官方 ROS 2 Humble 主力庫，提供 `ros2_control` 硬體介面與 MoveIt2 整合，支援 RA6/RS4 系列，可切模擬/實機，本專案兩支手臂是由此套件驅動（本手冊 §4 的 `hiwin_driver` 出自此庫）。 |
-| [hiwin_robot_client_library](https://github.com/HIWINCorporation/hiwin_robot_client_library) | 封裝與機器人控制器底層通訊的介面庫，供 `hiwin_ros2` 呼叫。 |
-| [hiwin_ros](https://github.com/HIWINCorporation/hiwin_ros) | 舊版 ROS 1 程式庫，非 ROS 2。 |
+| [hiwin_ros2](https://github.com/HIWINCorporation/hiwin_ros2) | The main official ROS 2 Humble repository, providing a `ros2_control` hardware interface and MoveIt2 integration. It supports the RA6/RS4 series and can switch between simulation and physical hardware. Both arms in this project are driven by this package (the `hiwin_driver` used in §4 comes from this repository). |
+| [hiwin_robot_client_library](https://github.com/HIWINCorporation/hiwin_robot_client_library) | An interface library that encapsulates low-level communication with the robot controller and is used by `hiwin_ros2`. |
+| [hiwin_ros](https://github.com/HIWINCorporation/hiwin_ros) | Legacy ROS 1 repository; not ROS 2. |
 
-本 workspace 的 `hiwin_dual_arm_description` 使用了上列官方程式庫中的
-`hiwin_description` 套件；其餘套件則參考上銀 hiwin_ros2 的手臂控制套件開發而成。
+The `hiwin_dual_arm_description` package in this workspace uses the `hiwin_description` package from the official libraries listed above.
+The remaining packages were developed with reference to the arm-control packages in HIWIN's `hiwin_ros2` repository.
 
 ---
 
-## 8. 授權
+## 8. License
 
-各 package 授權於其 `package.xml` 標註；`hiwin_dual_arm_description` 之衍生內容出處見該包 `NOTICE`。
+The license for each package is specified in its `package.xml` file. For attribution of derived content in `hiwin_dual_arm_description`, see that package's `NOTICE` file.
